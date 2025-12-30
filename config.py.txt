@@ -1,0 +1,8 @@
+# 🔐 Telegram
+BOT_TOKEN = "7479880371:AAHemgaC1OO2Ni-8ClbH9aYG4c8_FXoIQik"
+
+# 👮 Администраторы (Telegram ID)
+ADMINS = [7940060404]
+
+# 📞 Поддержка (первый админ)
+7940060404 = ADMINS[0]
