@@ -1,136 +1,90 @@
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup
-)
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-from config import BOT_TOKEN, ADMINS, SUPPORT_ADMIN_ID
+# =========================
+# Telegram Bot Configuration
+# =========================
 
+# 🔐 Токен Telegram-бота (из @BotFather)
+BOT_TOKEN = "7479880371:AAHemgaC1OO2Ni-8ClbH9aYG4c8_FXoIQik"
 
-SUPPORT_WAIT = set()
+# 👮 Администраторы (Telegram ID)
+ADMINS = [7940060404]  # Это твой ID
 
+# =========================
+# Основной код бота
+# =========================
 
-# ───── /start ─────
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["💰 Пополнить", "💸 Вывести"],
-        ["👤 Мой аккаунт"],
-        ["📞 Поддержка"]
-    ]
-    markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+import logging
 
-    await update.message.reply_text(
-        "👋 Добро пожаловать в Winwin Gambling\n\n"
-        "Выберите действие:",
-        reply_markup=markup
-    )
+# Включаем логирование, чтобы видеть ошибки
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
 
+logger = logging.getLogger(__name__)
 
-# ───── Мой аккаунт ─────
-async def account(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Функция для команды /start
+def start(update, context):
     user = update.effective_user
-
-    text = (
-        "👤 *Ваш аккаунт*\n\n"
-        f"Telegram ID: `{user.id}`\n"
-        f"Username: @{user.username}\n"
-        "Валюта: RUB\n"
-        "Статус: Активен"
+    update.message.reply_text(
+        f'Привет, {user.first_name}! 👋\n'
+        f'Я твой телеграм-бот!\n'
+        f'Твой ID: {user.id}'
     )
 
-    await update.message.reply_text(text, parse_mode="Markdown")
-
-
-# ───── Поддержка ─────
-async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    SUPPORT_WAIT.add(update.effective_user.id)
-
-    await update.message.reply_text(
-        "📞 Напишите сообщение для службы поддержки.\n"
-        "Мы передадим его администратору."
+# Функция для команды /help
+def help_command(update, context):
+    update.message.reply_text(
+        'Доступные команды:\n'
+        '/start - Начать работу\n'
+        '/help - Помощь\n'
+        '/admin - Для администраторов'
     )
 
-
-async def support_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Функция для команды /admin
+def admin_command(update, context):
     user_id = update.effective_user.id
-
-    if user_id not in SUPPORT_WAIT:
-        return
-
-    text = (
-        "📩 *Сообщение в поддержку*\n\n"
-        f"От: {update.effective_user.full_name}\n"
-        f"Telegram ID: `{user_id}`\n\n"
-        f"{update.message.text}"
-    )
-
-    await context.bot.send_message(
-        chat_id=SUPPORT_ADMIN_ID,
-        text=text,
-        parse_mode="Markdown"
-    )
-
-    SUPPORT_WAIT.remove(user_id)
-    await update.message.reply_text("✅ Сообщение отправлено.")
-
-
-# ───── Админ ответ ─────
-async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMINS:
-        return
-
-    if not update.message.reply_to_message:
-        return
-
-    lines = update.message.reply_to_message.text.split("\n")
-    user_id = None
-
-    for line in lines:
-        if "Telegram ID:" in line:
-            user_id = int(line.split("`")[1])
-
-    if user_id:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"💬 Ответ поддержки:\n\n{update.message.text}"
+    
+    if user_id in ADMINS:
+        update.message.reply_text(
+            f'Привет, администратор! 👑\n'
+            f'Твой ID: {user_id}\n'
+            f'Ты можешь управлять ботом.'
         )
+    else:
+        update.message.reply_text('У вас нет прав администратора!')
 
+# Функция для обработки текстовых сообщений
+def echo(update, context):
+    text = update.message.text
+    update.message.reply_text(f'Вы написали: {text}')
 
-# ───── Заглушки ─────
-async def deposit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💰 Пополнение\n\n"
-        "Скоро будет доступно."
-    )
+# Функция для обработки ошибок
+def error(update, context):
+    logger.warning(f'Update {update} вызвал ошибку {context.error}')
 
-
-async def withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💸 Вывод средств\n\n"
-        "Скоро будет доступен."
-    )
-
-
-# ───── Запуск ─────
+# Основная функция
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # Создаем Updater и передаем ему токен бота
+    updater = Updater(BOT_TOKEN, use_context=True)
+    
+    # Получаем dispatcher для регистрации обработчиков
+    dp = updater.dispatcher
+    
+    # Регистрируем обработчики команд
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_command))
+    dp.add_handler(CommandHandler("admin", admin_command))
+    
+    # Регистрируем обработчик для текстовых сообщений
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+    
+    # Регистрируем обработчик ошибок
+    dp.add_error_handler(error)
+    
+    # Запускаем бота
+    updater.start_polling()
+    
+    # Останавливаем бота при нажатии Ctrl+C
+    updater.idle()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Text("👤 Мой аккаунт"), account))
-    app.add_handler(MessageHandler(filters.Text("📞 Поддержка"), support))
-    app.add_handler(MessageHandler(filters.Text("💰 Пополнить"), deposit))
-    app.add_handler(MessageHandler(filters.Text("💸 Вывести"), withdraw))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, support_message))
-    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT, admin_reply))
-
-    print("✅ Bot is running...")
-    app.run_polling()
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
